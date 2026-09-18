@@ -1,0 +1,41 @@
+{
+ "schema": "icu-study-index/1",
+ "cases": [
+  {
+   "id": "tp_fh018",
+   "role": "train",
+   "file": "tp_fh018.json",
+   "bytes": 5634090
+  },
+  {
+   "id": "gefs_PRMSL_fh084",
+   "role": "free",
+   "file": "gefs_PRMSL_fh084.json",
+   "bytes": 3596235
+  },
+  {
+   "id": "gefs_PRMSL_fh024",
+   "role": "C1",
+   "file": "gefs_PRMSL_fh024.json",
+   "bytes": 3596450
+  },
+  {
+   "id": "gefs_tmp850_fh024",
+   "role": "C2",
+   "file": "gefs_tmp850_fh024.json",
+   "bytes": 3596284
+  },
+  {
+   "id": "ect850_fh084",
+   "role": "C3",
+   "file": "ect850_fh084.json",
+   "bytes": 5634285
+  },
+  {
+   "id": "gefs_RH_fh024",
+   "role": "C4",
+   "file": "gefs_RH_fh024.json",
+   "bytes": 3596121
+  }
+ ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "isovalue-expert-study-tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "walk": "node study_walk.mjs ." },
+  "devDependencies": { "playwright": "^1.62.0" }
+}

@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+node_modules/
+tests/*.png
+tests/package-lock.json
+.DS_Store
+Thumbs.db
