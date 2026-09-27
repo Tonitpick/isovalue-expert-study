@@ -5,7 +5,7 @@
   const { h, clear, Cases, Plan, Content, Store, Charts, fmtVal, fmtDur, mean, median, round, toCSV, saveFile, toast } = ICU;
   const ML = Plan.METHOD_LABEL;
   const TYPE_KEYS = Content.markTypes;
-  const CH_LABEL = { G: "位置摆动", C: "边界模糊", T: "系统个数不同", U: "说不清" };
+  const CH_LABEL = { G: "位置摆动", C: "边界模糊", T: "分块个数不同", U: "说不清" };
 
   /* =====================================================================
    * 评分

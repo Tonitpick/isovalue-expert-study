@@ -325,7 +325,7 @@
         amp: (rng() < 0.5 ? -1 : 1) * (0.6 + rng() * 0.8),
         r: 10 + rng() * 16,
         spread: 1.5 + rng() * 5.5, // 成员位置扰动（格）
-        split: rng() < 0.35, // 部分成员分裂成两个中心 -> 系统个数不同
+        split: rng() < 0.35, // 部分成员分裂成两个中心 -> 分块个数不同
       });
     const lead = { train: 18, free: 84, C1: 24, C2: 24, C3: 84, C4: 24 }[roleKey];
     const growth = lead > 48 ? 1.8 : 1;

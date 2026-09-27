@@ -94,6 +94,7 @@
       }
       const cfg = lsGet("config/study");
       if (cfg) this.config = { ...DEFAULT_CONFIG, ...cfg };
+      await this._loadDefaultRefs();
 
       // 云端
       let db = null;
@@ -143,7 +144,7 @@
             lsSet(`reference/${remote.caseId}`, remote);
           } else pushRefs.push(local);
         }
-        for (const [cid, r] of Object.entries(this.refs)) if (!seenR.has(cid)) pushRefs.push(r);
+        for (const [cid, r] of Object.entries(this.refs)) if (!seenR.has(cid) && !r.fromDefault) pushRefs.push(r);
         if (cf.exists) {
           const remote = cf.data();
           if ((remote.updatedAt || 0) >= (this.config.updatedAt || 0)) {
@@ -156,6 +157,22 @@
         this._setStatus("saved");
       } catch (e) {
         this._setStatus("error", `云端读取失败：${(e && e.message) || e}；本机备份仍在`);
+      }
+    },
+
+    /** 默认参照标注（cases/reference_default.json）：只填补还没有标注的案例；
+     *  一经编辑（saveRef）就成为本机 / 云端的正式标注，默认文件不再起作用。 */
+    async _loadDefaultRefs() {
+      try {
+        const res = await fetch("cases/reference_default.json", { cache: "no-store" });
+        if (!res.ok) return;
+        const obj = await res.json();
+        for (const ref of Object.values(obj.reference || {})) {
+          const cur = this.refs[ref.caseId];
+          if (!cur || !(cur.points || []).length) this.refs[ref.caseId] = { ...ref, updatedAt: 1, fromDefault: true };
+        }
+      } catch (_) {
+        /* 没有默认文件就算了 */
       }
     },
 
@@ -232,6 +249,7 @@
     },
     saveRef(caseId) {
       const r = this.getRef(caseId);
+      delete r.fromDefault;
       r.updatedAt = Date.now();
       r.annotator = this.config.annotator || r.annotator || "";
       lsSet(`reference/${caseId}`, r);
