@@ -21,6 +21,17 @@
   ];
   const FIND_CASES = ["C1", "C2", "C3", "C4"];
   const ATTR_CASES = ["C1", "C2", "C4"]; // 气压 / 温度 / 湿度
+  /* 归因题问哪一条线：在本文方法选出的线里，找目标来源最突出的那条，让三道题的答案不全一样。
+   * C1、C4 取“分块个数不同”（T）最突出的线，C2 取“边界模糊”（C）最突出的线；找不到就退回效用最高的线。 */
+  const ATTR_TARGET = { C1: "T", C2: "C", C4: "T" };
+  /* 读图训练的三个示例（练习图 = EC 海平面气压 +6h，均匀间隔的线）：网格坐标 + 所在候选下标 */
+  const TRAIN_EXAMPLES = {
+    msl_fh006_na: [
+      { idx: 13, x: 169, y: 105, type: "位置不一致", text: "成员的线形状差不多，但整体错开，排成一束平行的线。" },
+      { idx: 13, x: 115, y: 118, type: "边界宽窄不一", text: "成员线散成一条较宽的带子，说不清边界在哪。" },
+      { idx: 6, x: 230, y: 41, type: "分块个数不同", text: "平均线在这里围出一个小圈，但只有一部分成员闭合出来。" },
+    ],
+  };
   /* 盲化编号字母：去掉 C、P（和案例名、专家编号混淆），也去掉 I、O（和 1、0 混淆） */
   const CODE_LETTERS = "ABDEFGHJKLMNQRSTUVWXYZ";
 
@@ -67,6 +78,8 @@
     { key: "find", group: "找分歧", title: "找分歧", mins: 10, back: false, multi: true },
     { key: "attr", group: "读归因条", title: "读归因条", mins: 6, back: true, multi: true },
     { key: "blind", group: "三张图对比", title: "三张图对比", mins: 3, back: true },
+    // 揭晓：所有需要盲的判断都已做完，之后的选线对照、问卷、访谈要知道在评价哪一种；不能再返回改盲对比
+    { key: "unblind", group: "揭晓", title: "揭晓", mins: 1, back: false },
     { key: "reveal", group: "选线对照", title: "选线对照", mins: 5, back: true },
     { key: "survey", group: "问卷", title: "总体问卷", mins: 7, back: true },
     { key: "interview", group: "访谈", title: "访谈", mins: 10, back: true },
@@ -133,6 +146,12 @@
     blindR1: "若只能选一种用于日常会商，您选哪张？为什么？",
     blindR2a: "哪张最能看出成员之间的分歧？",
     blindR2b: "哪张最好读？",
+    unblindIntro: "前面需要您“不知情”判断的部分已经全部做完了。下面告诉您刚才几张图分别是用哪种方式选的线，接下来的对照、问卷和访谈会用到。",
+    methodPublic: {
+      ours: { name: "系统选线", text: "本研究的方法：估计每个数值上成员分歧有多大、有多可靠，挑出最值得看、彼此又不重复的线。" },
+      uniform: { name: "等间隔", text: "从低到高等距取值，是业务上最常用的画法。" },
+      js: { name: "另一种自动选线", text: "已发表的另一种自动选值方法，按等值线分布的差异来挑选有代表性的线。" },
+    },
     revealQs: [
       "系统选的线里，哪些您认可、哪些您不会画？",
       "您选了而系统没选的线，重要在哪？",
@@ -168,7 +187,7 @@
     ],
     readCard: [
       { sym: "thin", title: "细线", text: "一个集合成员的这条等值线" },
-      { sym: "thick", title: "粗线", text: "集合平均场的这条等值线" },
+      { sym: "thick", title: "粗线", text: "集合平均场的这条等值线，只作参照；有没有分歧要看细线" },
       { sym: "gray", title: "灰底", text: "集合平均场，越深数值越高" },
       { sym: "spread", title: "细线散开", text: "成员之间不一致，散得越开越不确定" },
       { sym: "band", title: "浅色带", text: "一半左右的成员认为“超过这个值”的区域，即分歧所在" },
@@ -192,6 +211,8 @@
       WILLIAMS,
       FIND_CASES,
       ATTR_CASES,
+      ATTR_TARGET,
+      TRAIN_EXAMPLES,
       assignFor,
       makePlan,
       STAGES,

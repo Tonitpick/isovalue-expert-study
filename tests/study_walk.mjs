@@ -1,4 +1,4 @@
-// 端到端走查：先 python serve.py --no-browser，再在 tests/ 下 npm install && node study_walk.mjs <截图目录>
+// 专家评估网页的端到端走查：node scripts/study_walk.mjs <outdir>
 import { chromium } from "playwright";
 
 const OUT = process.argv[2] || ".";
@@ -67,6 +67,8 @@ await wait(500);
 await shot("11_free");
 await page.click("#btn-next");
 await wait(1500);
+const exb = page.locator(".ex-btn");
+if (await exb.count()) { await exb.nth(2).click(); await wait(900); }
 await shot("12_train");
 await page.click("#btn-next");
 await wait(1500);
@@ -78,8 +80,17 @@ for (let f = 0; f < 4; f++) {
   await page.locator(".mk").first().locator(".seg").nth(2).click();
   await page.locator(".likert .lk").nth(2 + f).click();
   if (f === 0) {
-    await wait(400);
+    await page.locator(".legend .lg").nth(1).click();
+    await wait(500);
+    const mb = await page.locator(".work-map .map-cv.over").boundingBox();
+    for (let t = 0; t < 40; t++) {
+      await page.mouse.move(mb.x + mb.width * (0.2 + t * 0.015), mb.y + mb.height * 0.45);
+      await wait(30);
+      if ((await page.locator(".mem-tip").first().innerText()).includes("号成员")) break;
+    }
+    await wait(300);
     await shot("13_find1");
+    log("member tip:", await page.locator(".mem-tip").first().innerText());
   }
   await page.click("#btn-next");
   await page.waitForSelector(".scrim");
@@ -103,6 +114,9 @@ const blindSegs = page.locator(".segs.wide");
 await blindSegs.nth(0).locator(".seg").nth(1).click();
 await blindSegs.nth(1).locator(".seg").nth(0).click();
 await blindSegs.nth(2).locator(".seg").nth(2).click();
+await page.click("#btn-next");
+await wait(1200);
+await shot("16b_unblind", true);
 await page.click("#btn-next");
 await wait(1500);
 await shot("17_reveal", true);

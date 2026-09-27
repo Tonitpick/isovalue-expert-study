@@ -71,6 +71,29 @@
   function q(label, ...kids) {
     return h("div", { class: "qblock" }, h("div", { class: "qlabel" }, label), kids);
   }
+  /* 浅色带（25–75% 成员超过的区域）：深一点的橙色 + 一圈描边，铺在灰底和细线之间也看得出来 */
+  const WARM = new Set(["#c75a1e", "#b73a36", "#a87b00", "#8f5a2e", "#b8467e", "#e69f00", "#d55e00", "#cc79a7", "#b8a000", "#e05a8a"]);
+  const BAND = (lineColor) => ({ band: true, bandColor: WARM.has(lineColor) ? "#1f78b4" : "#e8590c", bandAlpha: 0.34, bandEdge: 0.9 });
+  /* 鼠标移到某条细线上时，只加粗这一个成员。getIdx() 返回当前固定的候选下标（null = 不启用）；
+   * onChange(member|null) 由调用方重绘并更新提示。 */
+  function memberHover(m, getIdx, onChange) {
+    let raf = null,
+      last = null,
+      pending = null;
+    m.o.onHover = (info) => {
+      pending = info;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = null;
+        const idx = getIdx();
+        const mem = pending && idx != null ? m.memberAt(idx, pending.gx, pending.gy) : null;
+        if (mem !== last) {
+          last = mem;
+          onChange(mem);
+        }
+      });
+    };
+  }
 
   /* =====================================================================
    * 专家区
@@ -184,6 +207,7 @@
         find: this.rFind,
         attr: this.rAttr,
         blind: this.rBlind,
+        unblind: this.rUnblind,
         reveal: this.rReveal,
         survey: this.rSurvey,
         interview: this.rInterview,
@@ -578,14 +602,48 @@
       const util = c.util || c.scu.mean;
       let focus = idxs.reduce((a, b) => (util[b] > util[a] ? b : a), idxs[0]);
       let hover = null;
+      let hiMember = null;
       const m = this.map({ case: c, ariaLabel: "训练图" });
       const stripBox = h("div", { class: "strip-box" });
+      const memTip = h("span", { class: "mem-tip" }, "");
+      const exText = h("p", { class: "ex-text muted small" }, "");
+      const examples = (Plan.TRAIN_EXAMPLES[c.id] || []).filter((e) => idxs.includes(e.idx));
+      let exOn = null;
       const draw = () => {
         const f = hover != null ? hover : focus;
-        m.setLevels(styledLevels(c, idxs, (idx) => ({ fade: idx === f ? 1 : 0.3, band: idx === f })));
+        m.setLevels(styledLevels(c, idxs, (idx, j) => (idx === f ? { fade: 1, ...BAND(lineStyle(j).color), hiMember: idx === focus ? hiMember : null } : { fade: 0.15 })));
         ICU.fill(stripBox, Charts.attrStrip(c, f, { curves: true }));
         for (const b of legend.children) b.classList.toggle("on", Number(b.dataset.idx) === focus);
+        memTip.textContent = hiMember != null ? `光标下：第 ${hiMember + 1} 号成员（共 ${c.M} 个）` : "";
+        exBtns.forEach((b, k) => b.classList.toggle("on", k === exOn));
+        const e = exOn != null ? examples[exOn] : null;
+        m.setMarkers(e ? [{ x: e.x, y: e.y, n: exOn + 1 }] : [], e ? [{ x: e.x, y: e.y, r: 6, fill: "rgba(232,89,12,0.06)", stroke: "rgba(232,89,12,0.8)" }] : []);
+        exText.textContent = e ? `示例 ${exOn + 1} · ${e.type}：${e.text}` : "点一个示例，地图会放大到那里，并突出那条线。";
       };
+      memberHover(m, () => focus, (mem) => {
+        hiMember = mem;
+        draw();
+      });
+      const exBtns = examples.map((e, k) =>
+        h(
+          "button",
+          {
+            type: "button",
+            class: "btn small ex-btn",
+            onclick: () => {
+              exOn = exOn === k ? null : k;
+              if (exOn != null) {
+                focus = e.idx;
+                m.focusOn(e.x, e.y);
+                s.train.examples = (s.train.examples || 0) + 1;
+                this.commit();
+              } else m.resetView();
+              draw();
+            },
+          },
+          `示例 ${k + 1} · ${e.type}`,
+        ),
+      );
       const legend = this.legend(c, idxs, {
         values: true,
         focus,
@@ -608,17 +666,20 @@
         },
       });
       ICU.append(body, 
-        this.stageHead("读图训练", "先熟悉一下这种图怎么看", "这一张只是练习，随便问、随便点。点下方图例里的某条线，会单独突出它，并在右侧显示它的归因条。"),
+        this.stageHead("读图训练", "先熟悉一下这种图怎么看", "这一张只是练习，随便问、随便点。点下方图例里的某条线，会单独突出它，并在右侧显示它的归因条；把鼠标移到这条线的某根细线上，可以单独看这一个成员。"),
         h(
           "div",
           { class: "work" },
-          h("div", { class: "work-map" }, h("div", { class: "map-title" }, h("span", null, this.caseTitle(c)), h("span", { class: "unit" }, c.unit)), m.el, legend),
+          h("div", { class: "work-map" }, h("div", { class: "map-title" }, h("span", null, this.caseTitle(c)), memTip, h("span", { class: "unit" }, c.unit)), m.el, legend),
           h(
             "aside",
             { class: "work-side" },
             h(
               "div",
               { class: "card sticky" },
+              examples.length ? h("h3", null, "三类分歧的示例") : null,
+              examples.length ? h("div", { class: "ex-row" }, exBtns) : null,
+              examples.length ? exText : null,
               h("h3", null, "读图卡"),
               h("ul", { class: "readcard" }, card),
               h("h3", null, "归因条的三种说法"),
@@ -688,7 +749,25 @@
               drawMarks();
             },
       });
-      const drawLines = () => m.setLevels(styledLevels(c, idxs, (idx) => ({ fade: hover == null || hover === idx ? 1 : 0.18 })));
+      // 点图例固定一条线（再点取消）；固定后，鼠标移到某根细线上只加粗这一个成员。三种画法同样可用。
+      let pinned = null;
+      let hiMember = null;
+      const memTip = h("span", { class: "mem-tip" }, "");
+      const drawLines = () => {
+        m.setLevels(
+          styledLevels(c, idxs, (idx) => {
+            if (pinned != null) return idx === pinned ? { fade: 1, hiMember } : { fade: 0.12 };
+            return { fade: hover == null || hover === idx ? 1 : 0.18 };
+          }),
+        );
+        memTip.textContent = hiMember != null ? `光标下：第 ${hiMember + 1} 号成员（共 ${c.M} 个）` : pinned != null ? "把鼠标移到细线上，可单独看一个成员" : "";
+      };
+      if (!readOnly)
+        memberHover(m, () => pinned, (mem) => {
+          hiMember = mem;
+          if (mem != null) F.memberViews = (F.memberViews || 0) + 1;
+          drawLines();
+        });
       const list = h("ol", { class: "marks", "aria-label": "已标出的分歧" });
       const count = h("span", { class: "pill" });
       const drawMarks = () => {
@@ -762,6 +841,15 @@
           hover = i;
           drawLines();
         },
+        onClick: (i) => {
+          pinned = pinned === i ? null : i;
+          hiMember = null;
+          F.pins = F.pins || [];
+          F.pins.push({ t: Date.now() - F.startedAt, idx: pinned });
+          this.commit();
+          for (const b of legend.children) b.classList.toggle("on", Number(b.dataset.idx) === pinned);
+          drawLines();
+        },
       });
       const nav = this.footer({
         ok: () => readOnly || F.q1 != null,
@@ -801,7 +889,14 @@
         h(
           "div",
           { class: "work" },
-          h("div", { class: "work-map" }, h("div", { class: "map-title" }, h("span", null, `图 ${code}`), h("span", { class: "unit" }, `${idxs.length} 条等值线 · ${c.M} 个成员`)), m.el, legend),
+          h(
+            "div",
+            { class: "work-map" },
+            h("div", { class: "map-title" }, h("span", null, `图 ${code}`), memTip, h("span", { class: "unit" }, `${idxs.length} 条等值线 · ${c.M} 个成员`)),
+            m.el,
+            legend,
+            h("p", { class: "muted small legend-hint" }, "点下方图例可以固定一条线、其他线变淡，再点一次取消；固定后把鼠标移到细线上，可以单独看这一个成员。"),
+          ),
           h(
             "aside",
             { class: "work-side" },
@@ -837,7 +932,13 @@
       const c = Cases.get(caseKey);
       const idxs = c.sel.ours.slice().sort((a, b) => a - b);
       const util = c.util || c.scu.mean;
-      const idx = idxs.reduce((a, b) => (util[b] > util[a] ? b : a), idxs[0]);
+      // 在本文方法选出的线里，取目标来源（Plan.ATTR_TARGET）最突出、且确实是三项中最高的那条；没有就退回效用最高的线
+      const target = Plan.ATTR_TARGET[caseKey];
+      const dominant = (i) => ["G", "C", "T"].reduce((a, b) => (c.desc[b][i] > c.desc[a][i] ? b : a));
+      const cands = target ? idxs.filter((i) => dominant(i) === target) : [];
+      const idx = cands.length
+        ? cands.reduce((a, b) => (c.desc[target][b] > c.desc[target][a] ? b : a))
+        : idxs.reduce((a, b) => (util[b] > util[a] ? b : a), idxs[0]);
       s.attr = s.attr || [];
       let A = s.attr[sub];
       if (!A || A.caseKey !== caseKey) {
@@ -853,9 +954,17 @@
         this.commitNow();
       }
       const m = this.map({ case: c, ariaLabel: "归因图" });
-      m.setLevels(
-        styledLevels(c, idxs, (i) => (i === idx ? { fade: 1, band: true, width: 2.2 } : { fade: 0.22 })),
-      );
+      let hiMember = null;
+      const memTip = h("span", { class: "mem-tip" }, "");
+      const drawAttr = () => {
+        m.setLevels(styledLevels(c, idxs, (i, j) => (i === idx ? { fade: 1, ...BAND(lineStyle(j).color), width: 2.2, hiMember } : { fade: 0.12 })));
+        memTip.textContent = hiMember != null ? `光标下：第 ${hiMember + 1} 号成员（共 ${c.M} 个）` : "";
+      };
+      memberHover(m, () => idx, (mem) => {
+        hiMember = mem;
+        drawAttr();
+      });
+      drawAttr();
       const j = idxs.indexOf(idx);
       const st = lineStyle(j);
       const nav = this.footer({
@@ -874,12 +983,12 @@
           { class: "stage-head" },
           h("div", { class: "eyebrow" }, `读归因条 · 第 ${sub + 1} / ${Plan.ATTR_CASES.length} 题`),
           h("h1", null, "请看图中加粗的这条线", h("span", { class: "line-chip", style: { "--c": st.color } }, fmtVal(c.candidates[idx], c.unit))),
-          h("p", { class: "lede" }, "浅色带是这条线上成员分歧所在的区域（约一半成员认为超过这个值）。其余线已调淡。"),
+          h("p", { class: "lede" }, "彩色的浅色带是这条线上成员分歧所在的区域：大约一半成员认为超过这个值、一半认为没超过。其余线已调淡；把鼠标移到细线上，可以单独看一个成员。"),
         ),
         h(
           "div",
           { class: "work" },
-          h("div", { class: "work-map" }, h("div", { class: "map-title" }, h("span", null, this.caseTitle(c)), h("span", { class: "unit" }, c.unit)), m.el),
+          h("div", { class: "work-map" }, h("div", { class: "map-title" }, h("span", null, this.caseTitle(c)), memTip, h("span", { class: "unit" }, c.unit)), m.el),
           h(
             "aside",
             { class: "work-side" },
@@ -967,6 +1076,60 @@
           { class: "blind-qs" },
           h("div", { class: "card" }, q(h("span", null, h("b", null, "R1　"), Content.blindR1), choice(opts, B.r1, set("r1"), "wide")), textArea(B.r1why, (v) => ((B.r1why = v), this.commit()), "为什么？（主持人记录）", 3, "blind-why")),
           h("div", { class: "card" }, q(h("span", null, h("b", null, "R2a　"), Content.blindR2a), choice(opts, B.r2a, set("r2a"), "wide")), q(h("span", null, h("b", null, "R2b　"), Content.blindR2b), choice(opts, B.r2b, set("r2b"), "wide")), h("p", { class: "muted small" }, "两题可以是同一张，也可以不是。")),
+        ),
+        nav,
+      );
+    },
+    /* =====================================================================
+     * 6.5 揭晓：盲的判断都做完之后，告诉参与者每张图是哪种画法
+     * ===================================================================== */
+    rUnblind(body) {
+      const s = this.s;
+      s.unblind = s.unblind || {};
+      if (!s.unblind.at) {
+        s.unblind.at = Date.now();
+        this.commitNow();
+      }
+      const MP = Content.methodPublic;
+      const tag = (mm) => h("span", { class: `mtag m-${mm}` }, MP[mm].name);
+      const blindRows = s.plan.blindOrder.map((mm) => h("tr", null, h("td", { class: "code" }, `图 ${s.plan.blindCodes[mm]}`), h("td", null, tag(mm))));
+      const findRows = s.plan.order.map((ck, i) => {
+        const c = Cases.get(ck);
+        const mm = s.plan.assign[ck];
+        return h("tr", null, h("td", { class: "num" }, `第 ${i + 1} 张`), h("td", { class: "code" }, `图 ${s.plan.codes[ck]}`), h("td", null, this.caseTitle(c)), h("td", null, tag(mm)));
+      });
+      const legendRows = ["ours", "uniform", "js"].map((mm) => h("li", null, tag(mm), h("span", null, MP[mm].text)));
+      // 把上一页的三张图按原来的左中右顺序重现，编号旁直接标上选线方式
+      const cf = Cases.get("free");
+      const cards = s.plan.blindOrder.map((mm) => {
+        const code = s.plan.blindCodes[mm];
+        const idxs = cf.sel[mm];
+        const m = this.map({ case: cf, ariaLabel: `图 ${code}`, readout: false, maxHeight: 360 });
+        m.setLevels(styledLevels(cf, idxs));
+        return h(
+          "figure",
+          { class: "blind-card" + (mm === "ours" ? " is-ours" : "") },
+          h("figcaption", null, h("span", { class: "fig-code" }, `图 ${code}`), tag(mm), h("button", { type: "button", class: "btn small ghost", onclick: () => this.zoomFigure(cf, idxs, code) }, "放大看")),
+          m.el,
+        );
+      });
+      const nav = this.footer({
+        onNext: () => {
+          s.unblind.ms = Date.now() - this.stepStart();
+          this.commitNow();
+          this.go(1);
+        },
+      });
+      ICU.append(body,
+        this.stageHead("揭晓", "刚才几张图分别是哪种选线方式", Content.unblindIntro),
+        h("h3", { class: "unblind-sub" }, `刚才的三张图对比（${this.caseTitle(cf)}，同样 ${s.k} 条线）`),
+        h("div", { class: "blind-grid unblind-maps" }, cards),
+        h(
+          "div",
+          { class: "unblind-grid" },
+          h("div", { class: "card" }, h("h3", null, "三种选线方式"), h("ul", { class: "mlegend" }, legendRows)),
+          h("div", { class: "card" }, h("h3", null, "三张图对比的编号"), h("table", { class: "tbl compact" }, h("tbody", null, blindRows))),
+          h("div", { class: "card" }, h("h3", null, "前面找分歧的四张图"), h("table", { class: "tbl compact" }, h("tbody", null, findRows))),
         ),
         nav,
       );

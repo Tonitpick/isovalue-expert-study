@@ -101,9 +101,9 @@
     }
     return g;
   }
-  function bandImage(c, idx, color, alpha = 0.26) {
+  function bandImage(c, idx, color, alpha = 0.26, edgeAlpha = 0) {
     const g = Geo.level(c, idx);
-    const key = `${color}|${alpha}`;
+    const key = `${color}|${alpha}|${edgeAlpha}`;
     g.bandImgs = g.bandImgs || {};
     if (g.bandImgs[key]) return g.bandImgs[key];
     const cv = document.createElement("canvas");
@@ -114,12 +114,19 @@
     const r = parseInt(color.slice(1, 3), 16),
       gg = parseInt(color.slice(3, 5), 16),
       b = parseInt(color.slice(5, 7), 16);
-    for (let i = 0; i < c.nx * c.ny; i++) {
+    const nx = c.nx,
+      ny = c.ny;
+    const inBand = (x, y) => x >= 0 && y >= 0 && x < nx && y < ny && g.band[y * nx + x];
+    for (let i = 0; i < nx * ny; i++) {
       if (!g.band[i]) continue;
+      const x = i % nx,
+        y = (i / nx) | 0;
+      // 带的边缘格点（任一邻格不在带内）画得更深，形成一圈描边
+      const edge = edgeAlpha > 0 && !(inBand(x - 1, y) && inBand(x + 1, y) && inBand(x, y - 1) && inBand(x, y + 1));
       img.data[i * 4] = r;
       img.data[i * 4 + 1] = gg;
       img.data[i * 4 + 2] = b;
-      img.data[i * 4 + 3] = Math.round(alpha * 255);
+      img.data[i * 4 + 3] = Math.round((edge ? edgeAlpha : alpha) * 255);
     }
     ctx.putImageData(img, 0, 0);
     g.bandImgs[key] = cv;
@@ -438,18 +445,28 @@
       for (const L of this.levels) {
         if (!L.band) continue;
         w.globalAlpha = L.fade != null ? L.fade : 1;
-        w.drawImage(bandImage(c, L.idx, L.bandColor || L.color, L.bandAlpha || 0.26), -0.5, -0.5, c.nx, c.ny);
+        w.drawImage(bandImage(c, L.idx, L.bandColor || L.color, L.bandAlpha || 0.26, L.bandEdge || 0), -0.5, -0.5, c.nx, c.ny);
       }
       w.globalAlpha = 1;
-      // 成员细线
+      // 成员细线；hiMember 指定时，其余成员再淡一些，被指的那个成员最后加粗画
       for (const L of this.levels) {
         if (!L.members) continue;
         const g = pathsFor(c, L.idx);
+        const hi = L.hiMember != null ? L.hiMember : -1;
         w.strokeStyle = L.color;
-        w.globalAlpha = (L.alpha != null ? L.alpha : 0.4) * (L.fade != null ? L.fade : 1);
+        w.globalAlpha = (L.alpha != null ? L.alpha : 0.4) * (L.fade != null ? L.fade : 1) * (hi >= 0 ? 0.45 : 1);
         w.lineWidth = this._px(L.memberWidth || 0.9);
         w.setLineDash([]);
-        for (const p of g.memberPaths) w.stroke(p);
+        g.memberPaths.forEach((p, m) => m !== hi && w.stroke(p));
+        if (hi >= 0 && g.memberPaths[hi]) {
+          w.globalAlpha = 1;
+          w.strokeStyle = "#ffffff";
+          w.lineWidth = this._px(3.6);
+          w.stroke(g.memberPaths[hi]);
+          w.strokeStyle = L.color;
+          w.lineWidth = this._px(2.2);
+          w.stroke(g.memberPaths[hi]);
+        }
       }
       w.globalAlpha = 1;
       // 均值粗线：白色衬边 + 色线
@@ -586,6 +603,46 @@
           ctx.fillText(String(m.n), sx, sy + 0.5);
         }
       }
+    }
+    /** 候选 idx 上离网格点 (gx,gy) 最近的成员线；屏幕距离超过 tolPx 返回 null */
+    memberAt(idx, gx, gy, tolPx = 7) {
+      const segsAll = Geo.level(this.c, idx).members;
+      const kx = this.kx,
+        ky = this.ky;
+      let best = null,
+        bd = tolPx * tolPx;
+      for (let m = 0; m < segsAll.length; m++) {
+        const s = segsAll[m];
+        for (let i = 0; i < s.length; i += 4) {
+          // 屏幕像素空间里的点到线段距离
+          const ax = (s[i] - gx) * kx,
+            ay = (s[i + 1] - gy) * ky,
+            bx = (s[i + 2] - gx) * kx,
+            by = (s[i + 3] - gy) * ky;
+          if (Math.min(ax, bx) > tolPx || Math.max(ax, bx) < -tolPx || Math.min(ay, by) > tolPx || Math.max(ay, by) < -tolPx) continue;
+          const dx = bx - ax,
+            dy = by - ay;
+          const L2 = dx * dx + dy * dy || 1e-9;
+          const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2));
+          const ex = ax + t * dx,
+            ey = ay + t * dy;
+          const d = ex * ex + ey * ey;
+          if (d < bd) {
+            bd = d;
+            best = m;
+          }
+        }
+      }
+      return best;
+    }
+    /** 把网格点 (gx,gy) 放大到 s 倍并居中 */
+    focusOn(gx, gy, s = 2.6) {
+      this.view.s = s;
+      this._clampView();
+      this.view.x0 = gx - (this.c.nx - 1) / s / 2;
+      this.view.y0 = gy - (this.c.ny - 1) / s / 2;
+      this._clampView();
+      this._schedule();
     }
     _hitMarker(px, py) {
       let best = null,
