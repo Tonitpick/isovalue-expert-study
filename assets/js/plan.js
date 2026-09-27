@@ -7,7 +7,9 @@
   const METHOD_LABEL = { ours: "本文方法", uniform: "均匀间隔", js: "JS 散度法" };
   const METHOD_SHORT = { ours: "本文", uniform: "均匀", js: "JS" };
 
-  /* 画法分配：基础模板在序号 0–3 上循环移位，4–7 换用第二个模板 */
+  /* 画法分配：4 人一轮，模板 A 在序号 0–3 上循环移位（每个案例配到本文 2 次、另两种各 1 次）。
+   * 模板 B 是原 8 人方案的后半轮，现不再使用，保留备查。 */
+  const ROUND = 4;
   const TEMPLATE_A = ["ours", "uniform", "js", "ours"];
   const TEMPLATE_B = ["ours", "js", "uniform", "ours"];
   /* 4×4 Williams 拉丁方（每张图在每个位置各一次，前后相邻关系平衡） */
@@ -23,9 +25,8 @@
   const CODE_LETTERS = "ABDEFGHJKLMNQRSTUVWXYZ";
 
   function assignFor(seq) {
-    const s = ((seq % 8) + 8) % 8;
-    const tpl = s < 4 ? TEMPLATE_A : TEMPLATE_B;
-    const shift = s % 4;
+    const shift = ((seq % ROUND) + ROUND) % ROUND;
+    const tpl = TEMPLATE_A;
     const a = {};
     FIND_CASES.forEach((c, i) => (a[c] = tpl[(i + shift) % 4]));
     return a;
@@ -187,6 +188,7 @@
       METHOD_SHORT,
       TEMPLATE_A,
       TEMPLATE_B,
+      ROUND,
       WILLIAMS,
       FIND_CASES,
       ATTR_CASES,

@@ -391,8 +391,8 @@
       const m = this.map({ case: c, ariaLabel: "集合平均场", readoutValue: true });
       const draw = () => {
         const sel = F.values.slice().sort((a, b) => a - b);
-        const lv = sel.map((idx) => ({ idx, color: "#15191d", members: false, mean: true, width: 2.1, label: fmtVal(c.candidates[idx]) }));
-        if (preview != null && !sel.includes(preview)) lv.push({ idx: preview, color: "#6b7580", members: false, mean: true, width: 1.6, dash: [5, 4], label: fmtVal(c.candidates[preview]) });
+        const lv = sel.map((idx) => ({ idx, color: "#15191d", members: false, mean: true, width: 1.6, label: fmtVal(c.candidates[idx]) }));
+        if (preview != null && !sel.includes(preview)) lv.push({ idx: preview, color: "#6b7580", members: false, mean: true, width: 1.3, dash: [5, 4], label: fmtVal(c.candidates[preview]) });
         m.setLevels(lv);
       };
       const counter = h("div", { class: "counter" });
@@ -854,7 +854,7 @@
       }
       const m = this.map({ case: c, ariaLabel: "归因图" });
       m.setLevels(
-        styledLevels(c, idxs, (i) => (i === idx ? { fade: 1, band: true, width: 3 } : { fade: 0.22 })),
+        styledLevels(c, idxs, (i) => (i === idx ? { fade: 1, band: true, width: 2.2 } : { fade: 0.22 })),
       );
       const j = idxs.indexOf(idx);
       const st = lineStyle(j);

@@ -2,40 +2,40 @@
  "schema": "icu-study-index/1",
  "cases": [
   {
-   "id": "tp_fh018",
+   "id": "msl_fh006_na",
    "role": "train",
-   "file": "tp_fh018.json",
-   "bytes": 5634090
+   "file": "msl_fh006_na.json",
+   "bytes": 5634240
   },
   {
    "id": "gefs_PRMSL_fh084",
    "role": "free",
    "file": "gefs_PRMSL_fh084.json",
-   "bytes": 3596235
+   "bytes": 3596197
   },
   {
    "id": "gefs_PRMSL_fh024",
    "role": "C1",
    "file": "gefs_PRMSL_fh024.json",
-   "bytes": 3596450
+   "bytes": 3596412
   },
   {
-   "id": "gefs_tmp850_fh024",
+   "id": "gefs_tmp850_fh084",
    "role": "C2",
-   "file": "gefs_tmp850_fh024.json",
-   "bytes": 3596284
+   "file": "gefs_tmp850_fh084.json",
+   "bytes": 3596343
   },
   {
    "id": "ect850_fh084",
    "role": "C3",
    "file": "ect850_fh084.json",
-   "bytes": 5634285
+   "bytes": 5634252
   },
   {
    "id": "gefs_RH_fh024",
    "role": "C4",
    "file": "gefs_RH_fh024.json",
-   "bytes": 3596121
+   "bytes": 3596056
   }
  ]
 }

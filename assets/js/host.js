@@ -112,7 +112,7 @@
       const refresh = () => {
         const plan = Plan.makePlan(F.seq, { dropC3: F.dropC3 });
         ICU.fill(preview, 
-          h("h3", null, `配法 ${F.seq}`, h("span", { class: "muted small" }, `　模板 ${F.seq % 8 < 4 ? "A" : "B"} · Williams 第 ${(F.seq % 4) + 1} 行`)),
+          h("h3", null, `配法 ${F.seq}`, h("span", { class: "muted small" }, `　Williams 第 ${(F.seq % 4) + 1} 行`)),
           h(
             "table",
             { class: "tbl compact" },
@@ -238,11 +238,12 @@
     },
     balanceTable(cur) {
       const done = {};
-      for (const s of Store.listSessions()) if (!s.pilot) done[s.seq % 8] = (done[s.seq % 8] || 0) + 1;
+      const R = Plan.ROUND;
+      for (const s of Store.listSessions()) if (!s.pilot) done[s.seq % R] = (done[s.seq % R] || 0) + 1;
       return h(
         "details",
         { class: "balance" },
-        h("summary", null, "配法平衡表（8 人一轮）"),
+        h("summary", null, `配法平衡表（${R} 人一轮）`),
         h(
           "table",
           { class: "tbl compact" },
@@ -250,13 +251,13 @@
           h(
             "tbody",
             null,
-            Array.from({ length: 8 }, (_, i) => {
+            Array.from({ length: R }, (_, i) => {
               const p = Plan.makePlan(i);
-              return h("tr", { class: i === cur % 8 ? "hl" : "" }, h("td", { class: "num" }, i), Plan.FIND_CASES.map((ck) => h("td", null, mchip(p.assign[ck], true))), h("td", { class: "mono" }, p.order.join(" ")), h("td", { class: "num" }, done[i] || ""));
+              return h("tr", { class: i === cur % R ? "hl" : "" }, h("td", { class: "num" }, i), Plan.FIND_CASES.map((ck) => h("td", null, mchip(p.assign[ck], true))), h("td", { class: "mono" }, p.order.join(" ")), h("td", { class: "num" }, done[i] || ""));
             }),
           ),
         ),
-        h("p", { class: "muted small" }, "8 人下来每个案例配到本文方法 4 次、另两种各 2 次；出场顺序为 4×4 Williams 拉丁方。"),
+        h("p", { class: "muted small" }, "4 人下来每个案例配到本文方法 2 次、另两种各 1 次；出场顺序为 4×4 Williams 拉丁方，每个案例在每个位置各一次。4 人时不要勾“去掉 C3”，否则平衡被破坏。"),
       );
     },
     async start() {

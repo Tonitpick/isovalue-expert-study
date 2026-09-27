@@ -1,6 +1,6 @@
 /* 地图渲染（设计文档第 9 节）：三种画法共用完全相同的渲染，差别只来自"选了哪些值"。
  *   底图：集合平均场去饱和灰度填色 + 海岸线 / 湖泊 / 国界 + 经纬网
- *   线束：成员细线 ~0.9 px、不透明度 0.4；均值粗线 ~2.6 px（白色衬边）
+ *   线束：成员细线 ~0.9 px、不透明度 0.4；均值线 ~1.8 px（窄白色衬边）；线段串接后 Chaikin 平滑
  *   分歧带：25–75% 超越概率区域，只在归因、参照标注里显示
  * 坐标：网格坐标 (列 x, 行 y)，行 0 在北；等距圆柱投影。 */
 (function () {
@@ -8,10 +8,11 @@
   const ICU = window.ICU;
   const { h, Geo } = ICU;
 
-  /* 线色：10 色分类色板（已用 dataviz 校验：相邻 CVD ΔE ≥ 9.1、正常视觉 ≥ 19.6）。
+  /* 线色：9 色低饱和分类色板（dataviz 校验，灰底 #d6d9dc：相邻正常视觉 ΔE ≥ 16.2、CVD ≥ 7.0，
+   * 有图例与数值标注作第二编码）；第 10 色只在 k = 10 时用到。
    * 第 j 条（按数值从小到大）总用第 j 个颜色，与画法无关。 */
   const PALETTES = {
-    default: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948", "#0f9bb5", "#9c5a1a"],
+    default: ["#3a6db3", "#c75a1e", "#238a4a", "#7652b3", "#5f8a00", "#b8467e", "#0082a0", "#a87b00", "#b73a36", "#8f5a2e"],
     // 色盲友好：Okabe–Ito 为主，另加虚线型作第二编码
     cvd: ["#0072b2", "#e69f00", "#56b4e9", "#d55e00", "#009e73", "#cc79a7", "#6a3d9a", "#b8a000", "#1b7837", "#e05a8a"],
   };
@@ -30,15 +31,68 @@
   const FILL_STEPS = 12;
   const MARK_RED = "#d7263d";
 
+  /* marching squares 给的是互不相连的小线段：先按端点串成折线，再做两轮 Chaikin 平滑。
+   * 只改显示，不影响任何选线或计分（计分用的是 Geo 里的原始线段）。 */
+  function chainSegments(segs) {
+    const key = (x, y) => `${Math.round(x * 1000)},${Math.round(y * 1000)}`;
+    const n = segs.length / 4;
+    const ends = new Map(); // 端点 -> [段号, 哪一端]
+    const add = (k, v) => (ends.has(k) ? ends.get(k).push(v) : ends.set(k, [v]));
+    for (let s = 0; s < n; s++) {
+      add(key(segs[4 * s], segs[4 * s + 1]), [s, 0]);
+      add(key(segs[4 * s + 2], segs[4 * s + 3]), [s, 1]);
+    }
+    const used = new Uint8Array(n);
+    const lines = [];
+    const extend = (pts, x, y) => {
+      for (;;) {
+        const nxt = (ends.get(key(x, y)) || []).find(([s]) => !used[s]);
+        if (!nxt) return;
+        const [s, e] = nxt;
+        used[s] = 1;
+        x = segs[4 * s + (e ? 0 : 2)];
+        y = segs[4 * s + (e ? 1 : 3)];
+        pts.push(x, y);
+      }
+    };
+    for (let s = 0; s < n; s++) {
+      if (used[s]) continue;
+      used[s] = 1;
+      const fwd = [segs[4 * s], segs[4 * s + 1], segs[4 * s + 2], segs[4 * s + 3]];
+      extend(fwd, fwd[2], fwd[3]);
+      const back = [];
+      extend(back, fwd[0], fwd[1]);
+      const pts = [];
+      for (let i = back.length - 2; i >= 0; i -= 2) pts.push(back[i], back[i + 1]);
+      lines.push(pts.concat(fwd));
+    }
+    return lines;
+  }
+  function chaikin(pts, rounds = 2) {
+    for (let r = 0; r < rounds && pts.length >= 6; r++) {
+      const closed = Math.abs(pts[0] - pts[pts.length - 2]) < 1e-6 && Math.abs(pts[1] - pts[pts.length - 1]) < 1e-6;
+      const out = closed ? [] : [pts[0], pts[1]];
+      for (let i = 0; i + 3 < pts.length; i += 2) {
+        const [x0, y0, x1, y1] = [pts[i], pts[i + 1], pts[i + 2], pts[i + 3]];
+        out.push(0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1, 0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1);
+      }
+      if (closed) out.push(out[0], out[1]);
+      else out.push(pts[pts.length - 2], pts[pts.length - 1]);
+      pts = out;
+    }
+    return pts;
+  }
+
   /* 每个 (案例, 候选) 的 Path2D 缓存：网格坐标，重绘时只换变换矩阵 */
   function pathsFor(c, idx) {
     const g = Geo.level(c, idx);
     if (!g.meanPath) {
       const toPath = (segs) => {
         const p = new Path2D();
-        for (let i = 0; i < segs.length; i += 4) {
-          p.moveTo(segs[i], segs[i + 1]);
-          p.lineTo(segs[i + 2], segs[i + 3]);
+        for (const line of chainSegments(segs)) {
+          const pts = chaikin(line);
+          p.moveTo(pts[0], pts[1]);
+          for (let i = 2; i < pts.length; i += 2) p.lineTo(pts[i], pts[i + 1]);
         }
         return p;
       };
@@ -403,11 +457,11 @@
         if (!L.mean) continue;
         const g = pathsFor(c, L.idx);
         const fade = L.fade != null ? L.fade : 1;
-        const width = L.width || 2.6;
+        const width = L.width || 1.8;
         w.setLineDash([]);
-        w.globalAlpha = 0.85 * fade;
+        w.globalAlpha = 0.7 * fade;
         w.strokeStyle = "#ffffff";
-        w.lineWidth = this._px(width + 2.2);
+        w.lineWidth = this._px(width + 1.2);
         w.stroke(g.meanPath);
         w.globalAlpha = fade;
         w.strokeStyle = L.meanColor || L.color;

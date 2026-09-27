@@ -6,10 +6,10 @@
 
   /** 设计文档第 6 节 / questionnaire.md 的 6 个角色。id 决定角色。 */
   const ROLES = [
-    { key: "train", id: "tp_fh018", label: "读图训练", use: "教专家读图，内容不进论文", elementHint: "EC 总降水 +18h" },
+    { key: "train", id: "msl_fh006_na", label: "读图训练", use: "教专家读图，内容不进论文", elementHint: "EC 海平面气压 +6h" },
     { key: "free", id: "gefs_PRMSL_fh084", label: "凭经验选线 · 盲对比 · 结果对照", use: "决定全体专家的 k", elementHint: "GEFS 海平面气压 +84h" },
     { key: "C1", id: "gefs_PRMSL_fh024", label: "找分歧 C1 · 归因", use: "气压场；论文 5.5 节案例", elementHint: "GEFS 海平面气压 +24h" },
-    { key: "C2", id: "gefs_tmp850_fh024", label: "找分歧 C2 · 归因", use: "温度场，短时效", elementHint: "GEFS 850 hPa 温度 +24h" },
+    { key: "C2", id: "gefs_tmp850_fh084", label: "找分歧 C2 · 归因", use: "温度场，GEFS（与 C3 同时效、不同系统）", elementHint: "GEFS 850 hPa 温度 +84h" },
     { key: "C3", id: "ect850_fh084", label: "找分歧 C3", use: "温度场，长时效；超时先砍", elementHint: "EC 850 hPa 温度 +84h" },
     { key: "C4", id: "gefs_RH_fh024", label: "找分歧 C4 · 归因", use: "湿度场，归因最难；必须保留", elementHint: "GEFS 850 hPa 相对湿度 +24h" },
   ];
@@ -290,7 +290,7 @@
    * 注意：这里的"选线"是简化公式（三个描述子简单平均 + 平滑 + 贪心），
    * 不是层次贝叶斯 SCU，绝不能进论文。
    * ===================================================================== */
-  const DEMO_KIND = { train: "precip", free: "pressure", C1: "pressure", C2: "temp", C3: "temp", C4: "rh" };
+  const DEMO_KIND = { train: "pressure", free: "pressure", C1: "pressure", C2: "temp", C3: "temp", C4: "rh" };
   const DEMO_META = {
     precip: { element: "总降水", unit: "mm", M: 31 },
     pressure: { element: "海平面气压", unit: "hPa", M: 31 },
